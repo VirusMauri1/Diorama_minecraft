@@ -130,3 +130,6 @@ Minecraft/
 ```
 
 Las texturas de `assets/textures` se pueden editar con cualquier editor de imágenes. Si existe el archivo, el programa lo usa en lugar de la textura que genera.
+
+
+https://youtu.be/qCIBR9fBLxY
