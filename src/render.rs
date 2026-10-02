@@ -3,6 +3,7 @@
 
 use crate::math::{smoothstep, Vec3};
 use crate::noise::{halton, hash, Rng};
+use crate::dragon::Dragon;
 use crate::skybox::Skybox;
 use crate::world::{face_uv, Intersect, RayIntersect, World, AIR};
 use std::sync::Mutex;
@@ -26,10 +27,10 @@ pub struct Camera {
 
 impl Camera {
     /// Centro de la isla: la vista inicial y la rotacion giran alrededor de el.
-    pub const CENTER: Vec3 = Vec3::new(46.0, 47.0, 42.0);
+    pub const CENTER: Vec3 = Vec3::new(46.0, 54.0, 42.0);
     pub const DEFAULT_YAW: f32 = -0.55;
     pub const DEFAULT_PITCH: f32 = 0.20;
-    pub const DEFAULT_DIST: f32 = 128.0;
+    pub const DEFAULT_DIST: f32 = 140.0;
 
     /// Direccion desde el punto observado hacia la camara.
     fn back(yaw: f32, pitch: f32) -> Vec3 {
@@ -198,6 +199,7 @@ pub struct Scene {
     pub ambient_ground: Vec3,
     /// Centro de las ondas del agua (debajo del barco).
     pub ripple_center: Vec3,
+    pub dragon: Dragon,
 }
 
 #[derive(Clone, Copy)]

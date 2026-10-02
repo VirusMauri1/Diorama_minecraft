@@ -2,6 +2,7 @@
 // un barco pirata, un muelle con faroles y una espada con hoja de portal.
 // Coordenadas: 1 unidad = 1 bloque, con y hacia arriba.
 
+use crate::dragon::{Dragon, DragonBlocks};
 use crate::material::Material;
 use crate::math::{smoothstep, Vec3};
 use crate::noise::{rand3, vnoise};
@@ -14,7 +15,7 @@ use std::f32::consts::PI;
 use std::path::Path;
 
 pub const NX: i32 = 96;
-pub const NY: i32 = 92;
+pub const NY: i32 = 112;
 pub const NZ: i32 = 80;
 
 /// Altura de la superficie del agua (las celdas con y < WATER son agua).
@@ -82,6 +83,8 @@ struct Ids {
     cannon: u8,
     rope: u8,
     firefly: u8,
+    waterfall: u8,
+    dragon: DragonBlocks,
 }
 
 fn v3(x: f32, y: f32, z: f32) -> Vec3 {
@@ -127,6 +130,11 @@ fn build_library() -> (Lib, Ids) {
     let t_iron = lib.tex(tx::iron());
     let t_rope = lib.tex(tx::rope());
     let t_firefly = lib.tex(tx::firefly());
+    let t_waterfall = lib.tex(tx::waterfall());
+    let t_dragon = lib.tex(tx::dragon_scales());
+    let t_dragon_wing = lib.tex(tx::dragon_wing());
+    let t_dragon_bone = lib.tex(tx::dragon_bone());
+    let t_dragon_eye = lib.tex(tx::dragon_eye());
 
     // Materiales: textura propia + albedo, especular, reflectividad, transparencia
     let m_grass_top = lib.mat(Material::new("pasto", t_grass_top).albedo(0.9).specular(0.05, 8.0));
@@ -178,7 +186,18 @@ fn build_library() -> (Lib, Ids) {
     let m_window = lib.mat(Material::new("ventana iluminada", t_window).albedo(0.6).specular(0.6, 80.0).emissive(1.5));
     let m_iron = lib.mat(Material::new("hierro (canon)", t_iron).albedo(0.6).specular(0.7, 60.0).reflective(0.08));
     let m_rope = lib.mat(Material::new("cuerda", t_rope).albedo(0.85).specular(0.02, 4.0));
+    let m_waterfall = lib.mat(
+        Material::new("cascada", t_waterfall)
+            .albedo(0.8)
+            .specular(0.8, 60.0)
+            .reflective(0.05)
+            .transparent(0.45, 1.33, v3(0.16, 0.06, 0.025)),
+    );
     let m_firefly = lib.mat(Material::new("luciernaga", t_firefly).albedo(0.2).emissive(5.0));
+    let m_dragon = lib.mat(Material::new("escamas de dragon", t_dragon).albedo(0.85).specular(0.5, 40.0).reflective(0.03));
+    let m_dragon_wing = lib.mat(Material::new("ala de dragon", t_dragon_wing).albedo(0.9).specular(0.05, 8.0));
+    let m_dragon_bone = lib.mat(Material::new("hueso de dragon", t_dragon_bone).albedo(0.85).specular(0.2, 20.0));
+    let m_dragon_eye = lib.mat(Material::new("ojo de dragon", t_dragon_eye).albedo(0.5).emissive(3.0));
 
     let air = lib.full("aire", m_stone);
     assert_eq!(air, AIR);
@@ -226,6 +245,13 @@ fn build_library() -> (Lib, Ids) {
         cannon: lib.block("canon", m_iron, m_iron, m_iron, Shape::Boxes(vec![cannon_box]), AIR),
         rope: lib.block("cuerda", m_rope, m_rope, m_rope, Shape::Boxes(vec![link_box]), AIR),
         firefly: lib.block("luciernaga", m_firefly, m_firefly, m_firefly, Shape::Boxes(vec![firefly_box]), AIR),
+        waterfall: lib.full("cascada", m_waterfall),
+        dragon: DragonBlocks {
+            skin: lib.full("escamas de dragon", m_dragon),
+            wing: lib.full("ala de dragon", m_dragon_wing),
+            bone: lib.full("hueso de dragon", m_dragon_bone),
+            eye: lib.full("ojo de dragon", m_dragon_eye),
+        },
     };
     (lib, ids)
 }
@@ -273,6 +299,10 @@ fn ground_height(x: i32, z: i32) -> i32 {
         let depth = (2.0 + -f * 0.5).min(9.0);
         return WATER - 1 - depth.round() as i32;
     }
+    let creek = creek_dist(x, z);
+    if creek < 2.0 {
+        return WATER - 3;
+    }
     if f < 1.2 {
         return WATER - 1;
     }
@@ -288,7 +318,25 @@ fn ground_height(x: i32, z: i32) -> i32 {
         + 2.5 * (vnoise(fx * 0.09, fz * 0.09, 3) - 0.3);
     // El borde de la isla baja un poco (orilla redondeada)
     let rim = smoothstep(0.85, 1.0, island_edge(fx, fz)) * 2.0;
-    (WATER as f32 + shore * hills.max(0.0) - rim).round() as i32
+    let h = (WATER as f32 + shore * hills.max(0.0) - rim).round() as i32;
+    // Las orillas del arroyo no quedan mas bajas que el agua
+    if creek < 4.0 {
+        h.max(WATER)
+    } else {
+        h
+    }
+}
+
+/// Primera fila z del arroyo (ya dentro del lago).
+const CREEK_Z0: i32 = 56;
+
+/// Distancia horizontal al centro del arroyo que va del lago al borde del frente.
+fn creek_dist(x: i32, z: i32) -> f32 {
+    if z < CREEK_Z0 {
+        return f32::INFINITY;
+    }
+    let center = 38.0 + ((z - 60) as f32 * 0.35).sin() * 1.5;
+    (x as f32 + 0.5 - center).abs()
 }
 
 /// Fondo de la isla principal: un cono invertido de roca con estalactitas.
@@ -334,7 +382,7 @@ fn surface(x: i32, z: i32) -> Option<i32> {
 
 fn is_beach(x: i32, z: i32) -> bool {
     let f = lake_field(x as f32 + 0.5, z as f32 + 0.5);
-    (0.0..2.6).contains(&f)
+    (0.0..2.6).contains(&f) || creek_dist(x, z) < 3.0
 }
 
 fn build_terrain(w: &mut World, ids: &Ids) {
@@ -344,7 +392,7 @@ fn build_terrain(w: &mut World, ids: &Ids) {
                 continue;
             };
             let on_island = island_edge(x as f32 + 0.5, z as f32 + 0.5) < 1.0 || sword_dist(x as f32 + 0.5, z as f32 + 0.5) < 9.5;
-            let in_lake = on_island && lake_field(x as f32 + 0.5, z as f32 + 0.5) < 0.0;
+            let in_lake = on_island && (lake_field(x as f32 + 0.5, z as f32 + 0.5) < 0.0 || creek_dist(x, z) < 2.0);
             let sandy = in_lake || (on_island && is_beach(x, z));
             // Capa de tierra irregular bajo el pasto
             let soil = 3 + (vnoise(x as f32 * 0.2, z as f32 * 0.2, 13) * 3.0) as i32;
@@ -378,6 +426,26 @@ fn build_terrain(w: &mut World, ids: &Ids) {
                 for y in g + 1..WATER {
                     w.set(x, y, z, ids.water);
                 }
+            }
+        }
+    }
+}
+
+/// Cascada: el arroyo cae por el borde de la isla y se deshace en gotas abajo.
+fn build_waterfall(w: &mut World, ids: &Ids) {
+    for x in 0..NX {
+        // Ultima fila con isla en esta columna: ahi termina el arroyo
+        let Some(edge) = (CREEK_Z0..NZ).take_while(|&z| column(x, z).is_some()).last() else {
+            continue;
+        };
+        if creek_dist(x, edge) >= 2.0 {
+            continue;
+        }
+        let z = edge + 1;
+        for y in 1..WATER {
+            let spray = ((32 - y) as f32 / 24.0).clamp(0.0, 1.0);
+            if rand3(x, y, z) >= spray {
+                w.set(x, y, z, ids.waterfall);
             }
         }
     }
@@ -457,6 +525,9 @@ fn build_trees(w: &mut World, ids: &Ids) {
                 continue;
             }
             let near_dock = (56..72).contains(&x) && (56..74).contains(&z);
+            if creek_dist(x, z) < 6.0 {
+                continue;
+            }
             // Dejar libre la vista al lago desde la camara inicial
             let (vx, vz) = (fx - LAKE_C.0, fz - LAKE_C.1);
             let along = -0.75 * vx + 0.66 * vz;
@@ -916,6 +987,7 @@ pub fn build() -> Scene {
 
     let mut lanterns = Vec::new();
     build_terrain(&mut world, &ids);
+    build_waterfall(&mut world, &ids);
     build_sword(&mut world, &ids);
     build_dock(&mut world, &ids, &mut lanterns);
     build_ship(&mut world, &ids, &mut lanterns);
@@ -927,6 +999,10 @@ pub fn build() -> Scene {
     lantern_post(&mut world, &ids, ix as i32, iz as i32, &mut lanterns);
     build_fireflies(&mut world, &ids);
     world.finalize();
+
+    // Dragon del End volando en circulos sobre la isla
+    let mut dragon = Dragon::new(ids.dragon, v3(ISLAND_C.0, WATER as f32 + 54.0, ISLAND_C.1), 20.0);
+    dragon.place(&mut world, 0.0);
 
     // Luz de luna y un relleno azulado sin sombras
     let center = v3(ISLAND_C.0, WATER as f32, ISLAND_C.1);
@@ -957,5 +1033,6 @@ pub fn build() -> Scene {
         ambient_sky: v3(0.04, 0.05, 0.10),
         ambient_ground: v3(0.02, 0.018, 0.025),
         ripple_center: v3((BOW + STERN) as f32 / 2.0, WATER as f32, SHIP_Z),
+        dragon,
     }
 }

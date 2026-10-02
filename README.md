@@ -1,6 +1,6 @@
 # Diorama Minecraft: barco pirata en una isla flotante
 
-Diorama estilo Minecraft renderizado con **raytracing**, hecho en Rust sin librerías externas. La escena es una isla flotante con un bosque de cerezos, de noche. En el centro hay un lago con un barco pirata anclado y, a un lado, un monumento con forma de espada cuya hoja es un portal del Nether.
+Diorama estilo Minecraft renderizado con **raytracing**, hecho en Rust sin librerías externas. La escena es una isla flotante con un bosque de cerezos, de noche. En el centro hay un lago con un barco pirata anclado y, a un lado, un monumento con forma de espada cuya hoja es un portal del Nether. Sobre la isla vuela en círculos un dragón del End, y la escena tiene música de fondo.
 
 ![Vista principal](capturas/vista_noche.png)
 
@@ -30,13 +30,14 @@ A partir de esa idea, la escena final se fue transformando:
 ## Qué incluye la escena
 
 - **Isla flotante** con colinas, playa, un bosque de cerezos y una parte inferior de roca con cristales de amatista que brillan.
-- **Lago** con agua transparente, donde se ven el fondo y la cadena del ancla.
+- **Lago** con agua transparente, donde se ven el fondo y la cadena del ancla. Un arroyo sale del lago hasta el borde de la isla y cae como **cascada** al vacío.
 - **Barco pirata**:
   - casco de madera con cañones;
   - tres mástiles con velas rasgadas, la vela mayor con calavera y bandera pirata;
   - puesto de vigía, cuerdas y ventanas iluminadas en el camarote.
 - **Monumento de espada** con pedestal escalonado, velas encendidas y una hoja de portal morado translúcido.
 - **Muelle**, faroles e islotes flotantes alrededor.
+- **Dragón del End** con alas, cuernos y ojos morados brillantes, que vuela en círculos sobre la isla.
 - **Noche**: luna, estrellas, nubes y un mar de nubes debajo de la isla.
 
 ## Técnicas de render
@@ -73,6 +74,10 @@ Se necesita **Rust** instalado. La ventana interactiva funciona en **Windows**.
 cargo run --release
 ```
 
+### Música
+
+Pon tus canciones (`.mp3`, `.wav` o `.wma`) en la carpeta `musica/`. Se reproducen en orden alfabético por nombre de archivo y, cuando termina una, empieza la siguiente. Se usa el reproductor que ya trae Windows, sin librerías externas.
+
 También se puede generar una imagen sin abrir la ventana:
 
 ```bash
@@ -101,10 +106,15 @@ cargo run --release -- --render captura.png --samples 32
 | Z / X | Rotar el diorama |
 | + / - | Acercar y alejar |
 | O | Rotación automática |
+| F | Pausar o continuar el vuelo del dragón |
+| M | Siguiente canción |
+| N | Pausar o continuar la música y el dragón |
 | R | Reiniciar la cámara |
 | B | Activar o desactivar el bloom |
 | P | Guardar una captura PNG |
 | Esc | Salir |
+
+Mientras el dragón vuela, la imagen se muestra en modo de vista previa. Para ver la imagen en máxima calidad (por ejemplo, para una captura), pausa todo con **N** (música y dragón) o solo el dragón con **F**.
 
 ## Estructura del proyecto
 
@@ -115,6 +125,7 @@ Minecraft/
 │   ├── textures/   texturas de los bloques (se pueden editar)
 │   └── skybox/     las 6 caras del cielo
 ├── capturas/       imágenes del resultado
+├── musica/         canciones de la isla
 └── image_dbcd86ff.jpg   imagen de referencia (Nano Banana)
 ```
 

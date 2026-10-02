@@ -1,0 +1,8 @@
+Pon aqui las canciones de la isla (.mp3, .wav o .wma).
+
+- Se reproducen en orden alfabetico por nombre de archivo
+  (por ejemplo: 1_cancion.mp3, 2_cancion.mp3).
+- Cuando termina una cancion empieza la siguiente.
+- En la ventana del diorama:
+    M  siguiente cancion
+    N  pausar / continuar la musica

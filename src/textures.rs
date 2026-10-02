@@ -376,3 +376,46 @@ pub fn rope() -> Texture {
 pub fn firefly() -> Texture {
     Texture::from_fn("firefly", 16, 16, |x, y| op(mix([0.95, 1.0, 0.45], [0.7, 1.0, 0.3], dist_center(x, y))))
 }
+
+/// Escamas del dragon del End: negras con brillo morado.
+pub fn dragon_scales() -> Texture {
+    Texture::from_fn("dragon_scales", 16, 16, |x, y| {
+        let edge = y % 4 == 0 || (x + (y / 4) % 2 * 2) % 4 == 0;
+        let c = if edge { [0.24, 0.17, 0.30] } else { [0.11, 0.09, 0.13] };
+        op(mul(c, grain(x, y, 40, 0.12)))
+    })
+}
+
+/// Membrana de las alas del dragon con venas.
+pub fn dragon_wing() -> Texture {
+    Texture::from_fn("dragon_wing", 16, 16, |x, y| {
+        let vein = (x + y / 3) % 6 == 0;
+        let c = if vein { [0.14, 0.11, 0.17] } else { [0.30, 0.24, 0.36] };
+        op(mul(c, grain(x, y, 41, 0.08) * (0.9 + 0.2 * blot(x, y, 42))))
+    })
+}
+
+/// Hueso gris de los cuernos y puas del dragon.
+pub fn dragon_bone() -> Texture {
+    Texture::from_fn("dragon_bone", 16, 16, |x, y| op(mul([0.60, 0.58, 0.64], grain(x, y, 43, 0.1))))
+}
+
+/// Ojos morados brillantes del dragon.
+pub fn dragon_eye() -> Texture {
+    Texture::from_fn("dragon_eye", 16, 16, |x, y| op(mix([0.85, 0.30, 1.0], [1.0, 0.85, 1.0], 1.0 - dist_center(x, y))))
+}
+
+/// Agua de la cascada: chorros claros que caen (el alfa marca lo transparente).
+pub fn waterfall() -> Texture {
+    Texture::from_fn("waterfall", 16, 16, |x, y| {
+        let offset = (rand2(x as i32, 0, 44) * 16.0) as usize;
+        let streak = rand2(x as i32, (((y + offset) % 16) / 4) as i32, 45);
+        if streak > 0.6 {
+            [0.82, 0.90, 1.0, 1.0]
+        } else if streak > 0.3 {
+            [0.50, 0.68, 0.95, 0.8]
+        } else {
+            [0.25, 0.45, 0.85, 0.55]
+        }
+    })
+}

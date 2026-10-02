@@ -1,9 +1,12 @@
 // Diorama estilo Minecraft con raytracing: un barco pirata en una isla
 // flotante de cerezos, de noche. Solo usa la libreria estandar de Rust.
 
+mod dragon;
 mod image_io;
 mod material;
 mod math;
+#[cfg(windows)]
+mod music;
 mod noise;
 mod render;
 mod scene;
@@ -112,6 +115,9 @@ fn print_controls() {
          \n  Z X                 rotar el diorama\
          \n  + -                 acercar y alejar (hacia el centro de la isla)\
          \n  O                   rotacion automatica del diorama\
+         \n  F                   pausar / continuar el vuelo del dragon\
+         \n  M                   siguiente cancion\
+         \n  N                   pausar / continuar la musica y el dragon\
          \n  R                   reiniciar camara\
          \n  B                   bloom on/off\
          \n  V                   haces de luz on/off\
@@ -198,7 +204,7 @@ fn render_offline(scene: &Scene, args: &Args, path: &Path) {
 }
 
 #[cfg(windows)]
-fn run_interactive(scene: &Scene, args: &Args) {
+fn run_interactive(scene: &mut Scene, args: &Args) {
     use std::time::Duration;
     use win32::*;
 
@@ -211,6 +217,7 @@ fn run_interactive(scene: &Scene, args: &Args) {
         }
     };
     print_controls();
+    let mut music = music::Music::start(Path::new("musica"));
 
     let mut cam = initial_camera(args);
     let mut settings = Settings::default();
@@ -231,6 +238,9 @@ fn run_interactive(scene: &Scene, args: &Args) {
     let mut redisplay = true;
     let mut shot = 0;
     let mut last_title = String::new();
+    let mut dragon_flying = true;
+    let mut paused = false;
+    let mut dragon_time = 0.0f32;
 
     while window.pump() {
         let now = Instant::now();
@@ -317,6 +327,14 @@ fn run_interactive(scene: &Scene, args: &Args) {
             match k {
                 VK_ESCAPE => return,
                 k if k == 'O' as i32 => auto_rotate = !auto_rotate,
+                k if k == 'F' as i32 => dragon_flying = !dragon_flying,
+                k if k == 'M' as i32 => music.next(),
+                k if k == 'N' as i32 => {
+                    // Pausar la musica tambien detiene al dragon (asi la imagen se refina)
+                    paused = !paused;
+                    music.set_paused(paused);
+                    dragon_flying = !paused;
+                }
                 k if k == 'R' as i32 => {
                     cam = Camera::default_view();
                     changed = true;
@@ -347,6 +365,14 @@ fn run_interactive(scene: &Scene, args: &Args) {
         }
         cam.clamp();
 
+        // El dragon vuela en circulos (mientras vuela la imagen no se refina)
+        if dragon_flying {
+            dragon_time += dt;
+            scene.dragon.place(&mut scene.world, dragon_time);
+            changed = true;
+        }
+        music.update();
+
         if changed {
             samples = 0;
             pass_row = 0;
@@ -365,7 +391,7 @@ fn run_interactive(scene: &Scene, args: &Args) {
             // Ajustar la resolucion de la vista previa para que sea fluida
             if ms > 45.0 && preview_scale < 8 {
                 preview_scale += 1;
-            } else if ms < 14.0 && preview_scale > 2 {
+            } else if ms < 14.0 && preview_scale > 1 {
                 preview_scale -= 1;
             }
             lw = w / preview_scale;
@@ -403,7 +429,7 @@ fn run_interactive(scene: &Scene, args: &Args) {
         }
 
         let title = format!(
-            "Diorama Minecraft | {} | pos ({:.0}, {:.0}, {:.0})  yaw {:.0}  pitch {:.0}{}{}",
+            "Diorama Minecraft | {} | pos ({:.0}, {:.0}, {:.0})  yaw {:.0}  pitch {:.0}{}{}{}",
             status,
             cam.pos.x,
             cam.pos.y,
@@ -412,6 +438,11 @@ fn run_interactive(scene: &Scene, args: &Args) {
             cam.pitch.to_degrees(),
             if settings.beams { "" } else { " | sin haces" },
             if settings.bloom { "" } else { " | sin bloom" },
+            match music.name() {
+                Some(n) if music.is_paused() => format!(" | musica en pausa: {n}"),
+                Some(n) => format!(" | musica: {n}"),
+                None => String::new(),
+            },
         );
         if title != last_title {
             window.set_title(&title);
@@ -424,7 +455,8 @@ fn main() {
     let args = parse_args();
     println!("Diorama Minecraft - raytracer en Rust sin librerias externas");
     let t = Instant::now();
-    let scene = scene::build();
+    #[allow(unused_mut)] // solo se modifica en la ventana interactiva (Windows)
+    let mut scene = scene::build();
     println!(
         "Escena lista en {:.2}s: {} bloques, {} materiales, {} texturas, {} luces, {} hilos",
         t.elapsed().as_secs_f32(),
@@ -447,7 +479,7 @@ fn main() {
     }
 
     #[cfg(windows)]
-    run_interactive(&scene, &args);
+    run_interactive(&mut scene, &args);
 
     #[cfg(not(windows))]
     {
